@@ -6,6 +6,9 @@
 
 uaddr_t ramtop = PROGTOP;
 
+// in agonlight.s
+extern uint8_t root_image_handle;
+
 void pagemap_init(void)
 {
     int i;
@@ -40,3 +43,11 @@ uint8_t plt_param(char *p)
     return 0;
 }
 
+void main()
+{
+    if (root_image_handle == 0) {
+        kprintf("Could not open rootfs image.\n");
+        return;
+    }
+    fuzix_main();
+}

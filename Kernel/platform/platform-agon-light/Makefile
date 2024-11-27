@@ -2,7 +2,7 @@
 #NSRCS = ../../dev/net/net_native.c
 CSRCS += devices.c main.c devtty.c devfd.c
 
-ASRCS = crt0.s ezretro.s
+ASRCS = crt0.s agonlight.s
 ASRCS += tricks.s commonmem.s
 
 AOBJS = $(ASRCS:.s=.rel)

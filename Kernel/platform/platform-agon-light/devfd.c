@@ -7,9 +7,15 @@
 #include <printf.h>
 #include <devfd.h>
 
+/* In agonlight.s */
+extern uint16_t rootfs_image_fread(uint8_t *buf, uint16_t bytes);
+extern uint8_t rootfs_image_fseek(uint32_t position);
+
 static int disk_transfer(bool is_read, uint8_t minor, uint8_t rawflag)
 {
     uint8_t st;
+
+#if 0
     uint8_t map = 0;
 
     if(rawflag == 1) {
@@ -21,42 +27,22 @@ static int disk_transfer(bool is_read, uint8_t minor, uint8_t rawflag)
         map = swappage;		        /* Acting on this page */
 #endif
     }
+#endif /* 0 */
 
-    struct {
-        uint16_t dma;
-        uint8_t bank;
-        //uint8_t drive;
-        uint8_t cmd;
-        uint16_t sector;
-    } __packed hdp;
+    kprintf("seek %u\n", 512 * (uint32_t)udata.u_block);
+    st = rootfs_image_fseek(512 * (uint32_t)udata.u_block);
 
-    hdp.bank = map;
-    //hdp.drive = minor;
-    hdp.dma = (uint16_t)udata.u_dptr;
-    hdp.sector = udata.u_block;
+    if (st) {
+        kprintf("hd%d: block %d, fseek error %d\n", minor, udata.u_block, st);
+    }
 
-    hdp.cmd = udata.u_nblock;
-    if (!is_read)
-        hdp.cmd |= 0x80;
-
-#if 1
-  if (udata.u_nblock != 1)
-    kprintf("  hd%d: %s @ %d\t#%d addr %d:%x desc 0x%x raw %d\n",
-            /*hdp.drive*/ 0, is_read ? "r" : "W",
-            hdp.sector, hdp.cmd & 0x7F, hdp.bank, hdp.dma, &hdp, rawflag);
-#endif
-    st = fd_cmd(&hdp);
+    kprintf("read %p %u\n", udata.u_dptr, 512 * udata.u_nblock);
+    rootfs_image_fread(udata.u_dptr, 512 * udata.u_nblock);
 
     if (st) {
         kprintf("hd%d: block %d, error %d\n", minor, udata.u_block, st);
         return 0;
     }
-
-#if 0
-    for (int i = 0; i < 16; ++i)
-        kprintf(" %x", ((uint8_t*) udata.u_dptr)[i]);
-    kprintf("\n");
-#endif
 
     udata.u_block += udata.u_nblock;
     return udata.u_nblock << 9;
@@ -86,6 +72,7 @@ int fd_write(uint8_t minor, uint8_t rawflag, uint8_t flag)
 
 int hd_open(uint8_t minor, uint16_t flag)
 {
+    kprintf("hd_open %d, %d\n", minor, flag);
     used(flag);
     if(minor >= 64) {
         udata.u_error = ENODEV;
@@ -96,12 +83,14 @@ int hd_open(uint8_t minor, uint16_t flag)
 
 int hd_read(uint8_t minor, uint8_t rawflag, uint8_t flag)
 {
+    kprintf("hd_read %d\n", minor);
     used(flag);
     return disk_transfer(true, minor+64, rawflag);
 }
 
 int hd_write(uint8_t minor, uint8_t rawflag, uint8_t flag)
 {
+    kprintf("hd_write %d\n", minor);
     used(flag);
     return disk_transfer(false, minor+64, rawflag);
 }

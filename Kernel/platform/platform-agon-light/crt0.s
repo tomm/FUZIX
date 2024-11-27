@@ -24,8 +24,9 @@
         .area _COMMONDATA
 
         ; imported symbols
-        .globl _fuzix_main
+        .globl _main
         .globl init_hardware
+        .globl open_disk_images
         .globl s__INITIALIZER
         .globl s__COMMONMEM
         .globl l__COMMONMEM
@@ -85,8 +86,10 @@ init2:
         ; Hardware setup
         call init_hardware
 
+		call open_disk_images
+
         ; Call the C main routine
-        call _fuzix_main
+        call _main
     
         ; main shouldn't return, but if it does...
         di

@@ -7,14 +7,18 @@
 ;
 
 
-            .module ezretro
+            .module agonlight
 
 	    .ez80
 	    .adl 0
 
             ; exported symbols
             .globl init_hardware
+			.globl open_disk_images
             .globl _program_vectors
+			.globl _root_image_handle
+			.globl _rootfs_image_fseek
+			.globl _rootfs_image_fread
 	    .globl plt_interrupt_all
 
 	    .globl map_kernel
@@ -99,6 +103,103 @@ init_hardware:
             pop hl
 
             ret
+	
+; set top byte of 24-bit HL to A
+copy_a_top_hl24:
+			.db #0x5b   ; .lil suffix
+			push hl
+			.db #0x5b   ; .lil suffix
+			ld hl, #2
+			.db 0
+			.db #0x5b   ; .lil suffix
+			add hl, sp
+			.db #0x5b   ; .lil suffix
+			ld (hl), a
+			.db #0x5b   ; .lil suffix
+			pop hl
+			ret
+
+_rootfs_image_fseek:
+			; (uint32_t position) -> uint8_t
+			push ix
+			ld ix,#0
+			add ix,sp
+
+			push hl
+			push de
+			push bc
+
+			ld hl,4(ix)  ; low 2 bytes of position
+			ld de,6(ix)  ; high 2 bytes of position
+
+			; mos_api_flseek wants 32-bit position in E:HL24
+			ld a,e
+			call copy_a_top_hl24
+			ld e,d
+			ld d,#0
+
+			ld a,(_root_image_handle)
+			ld c,a
+			ld a,#0x1c		; mos_api_flseek
+			.db #0x49   ; rst.lis (lis suffix)
+			rst 8
+			
+			;.db #0x5b   ; .lil suffix
+
+			pop hl
+			pop de
+			pop bc
+			pop ix
+			ret
+
+_rootfs_image_fread:
+			; params (uint8_t *buf, uint16_t bytes) -> uint16_t bytes read
+			push ix
+			ld ix,#0
+			add ix,sp
+			push bc
+			push de
+			push hl
+
+			ld a,(_root_image_handle)
+			ld c,a
+			ld hl,4(ix)
+			ld a,#4
+			call copy_a_top_hl24     ; set top byte HL24 to kernel segment (4)
+			; ld.lil de,#0
+			.db #0x5b   ; .lil suffix
+			ld de,#0
+			.db 0
+			ld de,6(ix)				; bytes to read
+			ld a,#0x1a				; mos_api_fread
+			.db #0x49   ; rst.lis (lis suffix)
+			rst 8
+
+			pop hl
+			ld h,d	; number of bytes read in hl
+			ld l,e
+			pop de
+			pop bc
+			pop ix
+			ret
+
+open_disk_images:
+			push hl
+			push bc
+			; Opens root (and swap eventually) disk images on the
+			; MOS BIOS's FAT filesystem
+			ld hl, #root_image_filename
+			ld c, #3 	; read-write
+			ld a, #10	; mos_api_fopen
+			.db #0x49   ; rst.lis (lis suffix)
+			rst 8
+			ld (_root_image_handle), a
+			pop bc
+			pop hl
+			ret
+
+_root_image_handle: .ds 1
+root_image_filename: .asciz "/fuzix.rootfs"
 
 ; this code runs in 24-bit ADL mode and must be placed outside SRAM
 ; FIXME this doesn't handle interrupts in ADL mode, avoid interrupts for now
