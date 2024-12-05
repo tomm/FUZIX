@@ -55,6 +55,29 @@ init:
 init2:
         di
 
+		; Enter VDP terminal mode
+		ld a, #23
+		.db #LIS
+		rst #0x10
+		ld a, #0
+		.db #LIS
+		rst #0x10
+		ld a, #255
+		.db #LIS
+		rst #0x10
+
+	; first copy common memory to location in kernel segment (0x4e000-0x4ffff)
+	; before mapping 8K sram over this area. The sole reason for doing this
+	; is to ensure that when timer interrupts occur (vblanks), the ADL-mode
+	; interrupt handler in the 0x40000 segment is actually present!
+	ld hl, #s__DATA
+	ld de, #s__COMMONMEM
+	ld bc, #l__COMMONMEM
+	ldir
+	ld de, #s__COMMONDATA
+	ld bc, #l__COMMONDATA
+	ldir
+
 		; Map common RAM (8K on-chip SRAM) to bank 4 (e000 - ffff)
 		; Kernel stack resides there, so we need this before
 		; we use the stack!
@@ -64,7 +87,7 @@ init2:
 
         ld sp, #kstack_top
 
-	; move the common memory where it belongs    
+	; move the common memory where it belongs (in SRAM)
 	ld hl, #s__DATA
 	ld de, #s__COMMONMEM
 	ld bc, #l__COMMONMEM

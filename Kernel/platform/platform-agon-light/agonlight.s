@@ -19,6 +19,7 @@
 			.globl _root_image_handle
 			.globl _rootfs_image_fseek
 			.globl _rootfs_image_fread
+			.globl _vblank_interrupt_z80
 	    .globl plt_interrupt_all
 
 	    .globl map_kernel
@@ -46,6 +47,7 @@
             ; imported symbols
             .globl _ramsize
             .globl _procmem
+			.globl _timer_interrupt
 
 	    .globl unix_syscall_entry
             .globl null_handler
@@ -74,21 +76,6 @@ plt_interrupt_all:
             .area _CODE
 
 init_hardware:
-            ; initialise UART0 to 9600 baud
-;           ld hl,#0x0380
-;           ld de,#0x1A06
-
-;    out0 (0xA5),h
-;    out0 (0xC3),l
-;    out0 (0xC0),d
-;    out0 (0xC3),h
-;    out0 (0xC2),e
-;            .db 0xED,0x21,0xA5        ; out0 (0A5h),h = 03h
-;            .db 0xED,0x29,0xC3        ; out0 (0C3h),l = 80h
-;            .db 0xED,0x11,0xC0        ; out0 (0C0h),d = 1Ah
-;            .db 0xED,0x21,0xC3        ; out0 (0C3h),h = 03h
-;            .db 0xED,0x19,0xC2        ; out0 (0C2h),e = 06h
-
             ; set system RAM size
 			; 512k - 64k (used by agon MOS) = 448K
             ld hl, #448
@@ -101,6 +88,15 @@ init_hardware:
             push hl
             call _program_vectors
             pop hl
+
+			; set up timer interrupt (using agon vblank)
+			ld hl, #_vblank_interrupt
+			ld a, #4				; in segment 0x40000
+			call copy_a_top_hl24	; MOS requires 24-bit interrupt handler pointer
+			ld e, #0x32		; interrupt number
+			ld a, #0x14 	; mos_api_setintvector
+			.db #0x49   ; rst.lis (lis suffix)
+			rst #0x8
 
             ret
 	
@@ -204,12 +200,16 @@ root_image_filename: .asciz "/fuzix.rootfs"
 ; this code runs in 24-bit ADL mode and must be placed outside SRAM
 ; FIXME this doesn't handle interrupts in ADL mode, avoid interrupts for now
 seladl:     
+			; need to di,ei here since timer interrupt could occur when
+			; SRAM is remapped but MBASE is not, and then all hell breaks loose
+			di
 			add a,#4			; Default Agon memory map -> RAM starts at segment 0x40000
 			; out0 (RAM_BANK),a		(move SRAM to selected bank)
             .db 0xED,0x39,0xB5
     	    ; ld  mb,a			(set MBASE to selected bank)
             .db 0xED,0x6D	
 			sub a,#4
+			ei
             ; jp.sis selret             (exit ADL mode)
             .db 0x40,0xC3 
             .dw selret
@@ -296,6 +296,41 @@ dskadr: .db 0,0,0   ; disk address + bank
 _int_disabled:
 	    .byte 1
 
+; arrive here in ADL mode (24-bit mode)
+_vblank_interrupt:
+		di
+		push af
+
+		; acknowledge the gpio interrupt
+		in0	a,(0x9a)
+		OR	a,#2
+		out0 (0x9a),a
+
+		push bc
+		push de
+		push hl
+		push ix
+		push iy
+
+		; call into Z80-mode
+		.db 0x40	; call.sis
+		call _vblank_interrupt_z80
+
+		pop iy
+		pop ix
+		pop hl
+		pop de
+		pop bc
+		pop af
+		ei
+		.db 0x5b	; reti.lil
+		reti
+
+_vblank_interrupt_z80:
+		call interrupt_handler
+		.db #0x49   ; .lis suffix
+		ret
+
 _program_vectors:
             ; we are called, with interrupts disabled, by both newproc() and crt0
 	    ; will exit with interrupts off
@@ -316,9 +351,9 @@ _program_vectors:
 
             ; now install the interrupt vector at 0x0038
             ld a, #0xC3 ; JP instruction
-            ld (0x0038), a
-            ld hl, #interrupt_handler
-            ld (0x0039), hl
+            ;ld (0x0038), a
+            ;ld hl, #interrupt_handler
+            ;ld (0x0039), hl
 
             ; set restart vector for FUZIX system calls
             ld (0x0030), a   ;  (rst 30h is unix function call vector)
@@ -369,6 +404,7 @@ map_proc_always_di:
 map_save_kernel:
 	    push af
             .db 0xED,0x38,0xB5 	; in0 a,(RAM_BANK)
+		sub a,#4
 	    ld (mapsave), a
 	    xor a
 	    call selmem

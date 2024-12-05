@@ -12,8 +12,8 @@
 #define CONFIG_MULTI
 /* Fixed banking */
 #define CONFIG_BANK_FIXED
-/* 8x 56K banks, 1 is kernel */
-#define MAX_MAPS	7
+/* 7x 56K banks, 1 is kernel */
+#define MAX_MAPS	6
 #define MAP_SIZE	0xE000U
 
 /* Networking (not usable yet but for debug/development) */

@@ -29,14 +29,14 @@ static int disk_transfer(bool is_read, uint8_t minor, uint8_t rawflag)
     }
 #endif /* 0 */
 
-    kprintf("seek %u\n", 512 * (uint32_t)udata.u_block);
+    //kprintf("seek %u\n", 512 * (uint32_t)udata.u_block);
     st = rootfs_image_fseek(512 * (uint32_t)udata.u_block);
 
     if (st) {
         kprintf("hd%d: block %d, fseek error %d\n", minor, udata.u_block, st);
     }
 
-    kprintf("read %p %u\n", udata.u_dptr, 512 * udata.u_nblock);
+    //kprintf("read %p %u\n", udata.u_dptr, 512 * udata.u_nblock);
     rootfs_image_fread(udata.u_dptr, 512 * udata.u_nblock);
 
     if (st) {
@@ -83,7 +83,6 @@ int hd_open(uint8_t minor, uint16_t flag)
 
 int hd_read(uint8_t minor, uint8_t rawflag, uint8_t flag)
 {
-    kprintf("hd_read %d\n", minor);
     used(flag);
     return disk_transfer(true, minor+64, rawflag);
 }
