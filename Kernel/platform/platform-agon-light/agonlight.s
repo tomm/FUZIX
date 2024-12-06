@@ -171,6 +171,8 @@ _rootfs_image_fread:
 			ld a,(_root_image_handle)
 			ld c,a
 			ld hl,4(ix)
+			.db 0xed,0x6e  ; ld a,mb
+			call copy_a_top_hl24     ; set top byte HL24 to kernel segment (4)
 			; ld.lil de,#0
 			.db #0x5b   ; .lil suffix
 			ld de,#0
@@ -200,6 +202,8 @@ _rootfs_image_fwrite:
 			ld a,(_root_image_handle)
 			ld c,a
 			ld hl,4(ix)
+			.db 0xed,0x6e  ; ld a,mb
+			call copy_a_top_hl24     ; set top byte HL24 to kernel segment (4)
 			; ld.lil de,#0
 			.db #0x5b   ; .lil suffix
 			ld de,#0
