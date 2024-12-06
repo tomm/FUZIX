@@ -27,6 +27,7 @@ tcflag_t termios_mask[NUM_DEV_TTY + 1] = {
 
 static uint8_t ttypoll;
 
+extern char uart0_char_in;
 extern void outchar(unsigned char c);
 
 /* Write to system console */
@@ -67,8 +68,10 @@ static uint8_t tmpReg;
 
 void tty_pollirq(void)
 {
-    if (ttystat & 1)
-        tty_inproc(1, ttydatap);
+    if (uart0_char_in) {
+        tty_inproc(1, uart0_char_in);
+        uart0_char_in = 0;
+    }
 }    
 
 void tty_setup(uint8_t minor, uint8_t flags)

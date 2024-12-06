@@ -20,6 +20,7 @@
 			.globl _rootfs_image_fseek
 			.globl _rootfs_image_fread
 			.globl _vblank_interrupt_z80
+			.globl _uart0_char_in
 	    .globl plt_interrupt_all
 
 	    .globl map_kernel
@@ -96,7 +97,16 @@ init_hardware:
 			ld e, #0x32		; interrupt number
 			ld a, #0x14 	; mos_api_setintvector
 			.db #0x49   ; rst.lis (lis suffix)
-			rst #0x8
+			rst #8
+
+			; set up keyboard event handler
+			ld hl, #uart0_rx_interrupt
+			ld a, #4				; in segment 0x40000
+			call copy_a_top_hl24
+			ld e, #0x18		; interrupt number
+			ld a, #0x14 	; mos_api_setintvector
+			.db #0x49   ; rst.lis (lis suffix)
+			rst #8
 
             ret
 	
@@ -295,6 +305,34 @@ dskadr: .db 0,0,0   ; disk address + bank
 
 _int_disabled:
 	    .byte 1
+_uart0_char_in:
+		.byte 1
+
+; arrive here in ADL mode (24-bit mode)
+uart0_rx_interrupt:
+		di
+		push af
+
+		; borrowed from Agon MOS UART0_serial_RX
+		in0		a,(0xc5)	; Get the line status register
+		and a, #1		    ; Check for characters in buffer
+		jr nz, .read_char
+		xor a
+		jr .done
+.read_char:
+		in0	a,(0xc0)	; Read the character from the UART receive buffer
+		; call into Z80-mode (so we can access common area)
+		.db 0x40	; call.sis
+		call uart0_rx_z80
+.done:
+		pop af
+		ei
+		.db 0x5b	; reti.lil
+		reti
+uart0_rx_z80:
+		ld (_uart0_char_in), a
+		.db #0x49   ; .lis suffix
+		ret
 
 ; arrive here in ADL mode (24-bit mode)
 _vblank_interrupt:
