@@ -9,6 +9,7 @@
 
 /* In agonlight.s */
 extern uint16_t rootfs_image_fread(uint8_t *buf, uint16_t bytes);
+extern uint16_t rootfs_image_fwrite(uint8_t *data, uint16_t bytes);
 extern uint8_t rootfs_image_fseek(uint32_t position);
 
 static int disk_transfer(bool is_read, uint8_t minor, uint8_t rawflag)
@@ -36,8 +37,13 @@ static int disk_transfer(bool is_read, uint8_t minor, uint8_t rawflag)
         kprintf("hd%d: block %d, fseek error %d\n", minor, udata.u_block, st);
     }
 
-    //kprintf("read %p %u\n", udata.u_dptr, 512 * udata.u_nblock);
-    rootfs_image_fread(udata.u_dptr, 512 * udata.u_nblock);
+    if (is_read) {
+        //kprintf("read %p %u\n", udata.u_dptr, 512 * udata.u_nblock);
+        rootfs_image_fread(udata.u_dptr, 512 * udata.u_nblock);
+    } else {
+        kprintf("write %p %u\n", udata.u_dptr, 512 * udata.u_nblock);
+        rootfs_image_fwrite(udata.u_dptr, 512 * udata.u_nblock);
+    }
 
     if (st) {
         kprintf("hd%d: block %d, error %d\n", minor, udata.u_block, st);

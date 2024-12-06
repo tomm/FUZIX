@@ -19,6 +19,7 @@
 			.globl _root_image_handle
 			.globl _rootfs_image_fseek
 			.globl _rootfs_image_fread
+			.globl _rootfs_image_fwrite
 			.globl _vblank_interrupt_z80
 			.globl _uart0_char_in
 	    .globl plt_interrupt_all
@@ -170,8 +171,6 @@ _rootfs_image_fread:
 			ld a,(_root_image_handle)
 			ld c,a
 			ld hl,4(ix)
-			ld a,#4
-			call copy_a_top_hl24     ; set top byte HL24 to kernel segment (4)
 			; ld.lil de,#0
 			.db #0x5b   ; .lil suffix
 			ld de,#0
@@ -183,6 +182,35 @@ _rootfs_image_fread:
 
 			pop hl
 			ld h,d	; number of bytes read in hl
+			ld l,e
+			pop de
+			pop bc
+			pop ix
+			ret
+
+_rootfs_image_fwrite:
+			; params (uint8_t *data, uint16_t bytes) -> uint16_t bytes written
+			push ix
+			ld ix,#0
+			add ix,sp
+			push bc
+			push de
+			push hl
+
+			ld a,(_root_image_handle)
+			ld c,a
+			ld hl,4(ix)
+			; ld.lil de,#0
+			.db #0x5b   ; .lil suffix
+			ld de,#0
+			.db 0
+			ld de,6(ix)				; bytes to read
+			ld a,#0x1b				; mos_api_fwrite
+			.db #0x49   ; rst.lis (lis suffix)
+			rst 8
+
+			pop hl
+			ld h,d	; number of bytes written in hl
 			ld l,e
 			pop de
 			pop bc
@@ -205,21 +233,15 @@ open_disk_images:
 			ret
 
 _root_image_handle: .ds 1
-root_image_filename: .asciz "/fuzix.rootfs"
+root_image_filename: .asciz "fuzix.rootfs"
 
 ; this code runs in 24-bit ADL mode and must be placed outside SRAM
 ; FIXME this doesn't handle interrupts in ADL mode, avoid interrupts for now
 seladl:     
-			; need to di,ei here since timer interrupt could occur when
-			; SRAM is remapped but MBASE is not, and then all hell breaks loose
-			di
 			add a,#4			; Default Agon memory map -> RAM starts at segment 0x40000
-			; out0 (RAM_BANK),a		(move SRAM to selected bank)
-            .db 0xED,0x39,0xB5
-    	    ; ld  mb,a			(set MBASE to selected bank)
-            .db 0xED,0x6D	
+			out0 (0xb5),a		; (move SRAM to selected bank)
+            .db 0xED,0x6D		; ld  mb,a (set MBASE to selected bank)
 			sub a,#4
-			ei
             ; jp.sis selret             (exit ADL mode)
             .db 0x40,0xC3 
             .dw selret
@@ -441,8 +463,8 @@ map_proc_always_di:
 
 map_save_kernel:
 	    push af
-            .db 0xED,0x38,0xB5 	; in0 a,(RAM_BANK)
-		sub a,#4
+	    .db 0xed,0x6e  ; ld a,mb
+	    sub a,#4
 	    ld (mapsave), a
 	    xor a
 	    call selmem

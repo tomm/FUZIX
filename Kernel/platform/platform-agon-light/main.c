@@ -46,7 +46,7 @@ uint8_t plt_param(char *p)
 void main()
 {
     if (root_image_handle == 0) {
-        kprintf("Could not open rootfs image.\n");
+        kprintf("Could not open ./fuzix.rootfs image.\n");
         return;
     }
     fuzix_main();
