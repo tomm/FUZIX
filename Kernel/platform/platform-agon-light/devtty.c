@@ -69,7 +69,12 @@ static uint8_t tmpReg;
 void tty_pollirq(void)
 {
     if (uart0_char_in) {
-        tty_inproc(1, uart0_char_in);
+        // Fuzix seems to want 8 for backspace
+        if (uart0_char_in == 127) {
+            tty_inproc(1, 8);
+        } else {
+            tty_inproc(1, uart0_char_in);
+        }
         uart0_char_in = 0;
     }
 }    
