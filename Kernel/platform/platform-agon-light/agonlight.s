@@ -242,6 +242,8 @@ root_image_filename: .asciz "fuzix.rootfs"
 ; this code runs in 24-bit ADL mode and must be placed outside SRAM
 ; FIXME this doesn't handle interrupts in ADL mode, avoid interrupts for now
 seladl:     
+			; Hmm. Perhaps 'di' necessary since bank switch is non-atomic (has 2 operations)
+			di
 			add a,#4			; Default Agon memory map -> RAM starts at segment 0x40000
 			out0 (0xb5),a		; (move SRAM to selected bank)
             .db 0xED,0x6D		; ld  mb,a (set MBASE to selected bank)
