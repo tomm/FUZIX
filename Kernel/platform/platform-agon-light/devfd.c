@@ -14,6 +14,7 @@ extern uint8_t rootfs_image_fseek(uint32_t position);
 
 static int disk_transfer(bool is_read, uint8_t minor, uint8_t rawflag)
 {
+    //kprintf("dt u_dptr %p u_base %p nblocks %d\n", udata.u_dptr, udata.u_base, udata.u_nblock);
     uint8_t st;
 
 #if 0
@@ -30,7 +31,7 @@ static int disk_transfer(bool is_read, uint8_t minor, uint8_t rawflag)
     }
 #endif /* 0 */
 
-    //kprintf("seek %u. ", 512 * (uint32_t)udata.u_block);
+    //kprintf("seek %ld. ", 512 * (uint32_t)udata.u_block);
     st = rootfs_image_fseek(512 * (uint32_t)udata.u_block);
 
     if (st) {
@@ -38,10 +39,10 @@ static int disk_transfer(bool is_read, uint8_t minor, uint8_t rawflag)
     }
 
     if (is_read) {
-        //kprintf("rd %p %u. ", udata.u_dptr, 512 * udata.u_nblock);
+        //kprintf("rd [%p] at %ld count %u. ", udata.u_dptr, 512 * (uint32_t)udata.u_block, 512 * udata.u_nblock);
         rootfs_image_fread(udata.u_dptr, 512 * udata.u_nblock);
     } else {
-        //kprintf("wr buf %p block %d num %u. ", udata.u_dptr, udata.u_block, 512 * udata.u_nblock);
+        //kprintf("%s-wr [%p] [%p] at %ld count %u.\n", udata.u_sysio ? "sys" : "usr", udata.u_dptr, udata.u_base, 512 * (uint32_t)udata.u_block, 512 * udata.u_nblock);
         rootfs_image_fwrite(udata.u_dptr, 512 * udata.u_nblock);
     }
 
@@ -56,24 +57,18 @@ static int disk_transfer(bool is_read, uint8_t minor, uint8_t rawflag)
 
 int fd_open(uint8_t minor, uint16_t flag)
 {
-    used(flag);
-    if(minor >= 4) {
-        udata.u_error = ENODEV;
-        return -1;
-    }
-    return 0;
+    udata.u_error = ENODEV;
+    return -1;
 }
 
 int fd_read(uint8_t minor, uint8_t rawflag, uint8_t flag)
 {
-    used(flag);
-    return disk_transfer(true, minor, rawflag);
+    return -1;
 }
 
 int fd_write(uint8_t minor, uint8_t rawflag, uint8_t flag)
 {
-    used(flag);
-    return disk_transfer(false, minor, rawflag);
+    return -1;
 }
 
 int hd_open(uint8_t minor, uint16_t flag)
@@ -100,22 +95,16 @@ int hd_write(uint8_t minor, uint8_t rawflag, uint8_t flag)
 
 int rd_open(uint8_t minor, uint16_t flag)
 {
-    used(flag);
-    if(minor >= 2) {
-        udata.u_error = ENODEV;
-        return -1;
-    }
-    return 0;
+    udata.u_error = ENODEV;
+    return -1;
 }
 
 int rd_read(uint8_t minor, uint8_t rawflag, uint8_t flag)
 {
-    used(flag);
-    return disk_transfer(true, minor+128, rawflag);
+    return -1;
 }
 
 int rd_write(uint8_t minor, uint8_t rawflag, uint8_t flag)
 {
-    used(flag);
-    return disk_transfer(false, minor+128, rawflag);
+    return -1;
 }

@@ -127,6 +127,7 @@ copy_a_top_hl24:
 			ret
 
 _rootfs_image_fseek:
+			di
 			; (uint32_t position) -> uint8_t
 			push ix
 			ld ix,#0
@@ -160,6 +161,7 @@ _rootfs_image_fseek:
 			ret
 
 _rootfs_image_fread:
+			di
 			; params (uint8_t *buf, uint16_t bytes) -> uint16_t bytes read
 			push ix
 			ld ix,#0
@@ -191,6 +193,7 @@ _rootfs_image_fread:
 			ret
 
 _rootfs_image_fwrite:
+			di
 			; params (uint8_t *data, uint16_t bytes) -> uint16_t bytes written
 			push ix
 			ld ix,#0
@@ -348,7 +351,6 @@ uart0_rx_interrupt:
 		xor a
 		jr .done
 .read_char:
-		in0	a,(0xc0)	; Read the character from the UART receive buffer
 		; call into Z80-mode (so we can access common area)
 		.db 0x40	; call.sis
 		call uart0_rx_z80
@@ -358,6 +360,7 @@ uart0_rx_interrupt:
 		.db 0x5b	; reti.lil
 		reti
 uart0_rx_z80:
+		in0	a,(0xc0)	; Read the character from the UART receive buffer
 		ld (_uart0_char_in), a
 		.db #0x49   ; .lis suffix
 		ret
@@ -415,13 +418,14 @@ _program_vectors:
             ld (hl), #0x00
             ldir
 
-            ; now install the interrupt vector at 0x0038
-            ld a, #0xC3 ; JP instruction
-            ;ld (0x0038), a
-            ;ld hl, #interrupt_handler
-            ;ld (0x0039), hl
+            ; rst.lil 0x38, to jump to MOS crash handler
+			ld a, #0x5b
+            ld (0x0038), a
+			ld a, #0xff
+            ld (0x0039), a
 
             ; set restart vector for FUZIX system calls
+            ld a, #0xC3 ; JP instruction
             ld (0x0030), a   ;  (rst 30h is unix function call vector)
             ld hl, #unix_syscall_entry
             ld (0x0031), hl
