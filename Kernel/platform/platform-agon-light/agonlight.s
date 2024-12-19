@@ -35,8 +35,6 @@
 	    .globl map_save_kernel
 	    .globl map_restore
 
-	    .globl _fd_cmd
-
 	    .globl _int_disabled
 
 	    .globl _plt_reboot
@@ -65,9 +63,24 @@
             .area _COMMONMEM
 
 _plt_monitor:
-_plt_reboot: ; FIXME    out (0), a ; exit emulator
-	    di
-            jr _plt_reboot
+_plt_reboot:
+		di
+		; exit VDP terminal mode
+		ld a,#27
+		call outchar
+		ld a,#'_'
+		call outchar
+		ld a,#'#'
+		call outchar
+		ld a,#'Q'
+		call outchar
+		ld a,#'!'
+		call outchar
+		ld a,#'$'
+		call outchar
+		.db 0x5b	; jp.lil 0
+		jp 0
+		.db 0
 
 plt_interrupt_all:
 	    ret
@@ -127,7 +140,6 @@ copy_a_top_hl24:
 			ret
 
 _rootfs_image_fseek:
-			di
 			; (uint32_t position) -> uint8_t
 			push ix
 			ld ix,#0
@@ -161,7 +173,6 @@ _rootfs_image_fseek:
 			ret
 
 _rootfs_image_fread:
-			di
 			; params (uint8_t *buf, uint16_t bytes) -> uint16_t bytes read
 			push ix
 			ld ix,#0
@@ -193,7 +204,6 @@ _rootfs_image_fread:
 			ret
 
 _rootfs_image_fwrite:
-			di
 			; params (uint8_t *data, uint16_t bytes) -> uint16_t bytes written
 			push ix
 			ld ix,#0
@@ -254,80 +264,6 @@ seladl:
             ; jp.sis selret             (exit ADL mode)
             .db 0x40,0xC3 
             .dw selret
-
-; FLOPPY DISK emulation, using a single 1536 KB RAM disk at 0x080000..0x1FFFFF
-; this can handle any bank, thanks to eZ80's 24-bit "ldir.l" instruction
-; there's no bank switching (and no need to disable interrupts, I think)
-;
-_fd_cmd:
-        pop de		; return
-        pop hl		; descriptor address
-        push hl
-        push de		; fix stack
-
-        ld a,(hl)              ; dma l
-        ld (dmaadr),a
-        inc hl
-        ld a,(hl)              ; dma h
-        ld (dmaadr+1),a
-        inc hl
-        ld a,(hl)              ; bank
-        ld (dmaadr+2),a
-        inc hl
-        ;ld a,(hl)              ; drive, ignored
-        ;inc hl
-        ld c,(hl)              ; cmd
-        inc hl
-        ld e,(hl)              ; sector l
-        inc hl
-        ld d,(hl)              ; sector h
-        ld h,d
-        ld l,e
-        add hl,de ; now it's a 512-byte multiple (top 2 bytes)
-        ld de,#0x0800
-        add hl,de ; now it's an offset in the ram disk (top 2 bytes)
-        ld (dskadr+1),hl
-
-    ;ld a,#'@'
-    ;add a,h
-    ;call outchar
-    ;ld a,#'@'
-    ;add a,l
-    ;call outchar
-
-        ld a,c
-        and #0x80
-        jr nz,dwrite
-
-dread:  .db 0x5B,0x2A                   ; ld.lil hl,({0,dskadr})
-	.dw dskadr
-	.db 0
-	.db 0x5B,0xED,0x5B              ; ld.lil de,({0,dmaadr})
-	.dw dmaadr
-	.db 0
-    ;ld a,#'r'
-    ;call outchar
-	jr drwop
-
-dwrite: .db 0x5B,0x2A                   ; ld.lil hl,({0,dmaadr})
-	.dw dmaadr
-	.db 0
-	.db 0x5B,0xED,0x5B              ; ld.lil de,({0,dskadr})
-	.dw dskadr
-	.db 0
-    ;ld a,#'w'
-    ;call outchar
-
-drwop:	.db 0x5B,0x01,0x00,0x02,0x00    ; ld.lil bc,000200h
-	.db 0x49,0xED,0xB0              ; ldir.l
-
-	xor a ; TODO this driver never reports any errors
-        ld l,a
-        ld h,a
-	ret
-
-dmaadr: .db 0,0,0   ; last dma address + bank
-dskadr: .db 0,0,0   ; disk address + bank
 
 ;------------------------------------------------------------------------------
 ; COMMON MEMORY PROCEDURES FOLLOW
@@ -491,8 +427,19 @@ map_restore:
 mapsave:    .db 0
 
 ; outchar: print the char in A
+; Note that devtty.c contains the routine usually used.
 outchar:
 _outchar:
-			.db 0x49 	; .lis
-			rst 0x10
-			ret
+		push af
+wait_uart0_cts:
+		in0 a,(0xa2)
+		tst a,#8
+		jr nz,wait_uart0_cts
+uart0_not_ready:
+		in0 a,(0xc5)  ; UART0_LSR
+		and #0x60      ; either TEMT or THRE (fifo empty, but transmit shift register can be active)
+		jr z, uart0_not_ready
+		; write to uart0
+		pop af
+		out0 (0xc0), a
+		ret

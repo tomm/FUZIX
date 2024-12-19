@@ -1,1 +1,1 @@
-export CPU = ez80_z80
+export CPU = z80

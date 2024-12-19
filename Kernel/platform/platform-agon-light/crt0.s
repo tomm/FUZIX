@@ -37,6 +37,8 @@
         .globl s__DATA
         .globl l__DATA
         .globl kstack_top
+		.globl monkey_patch_reti_1
+		.globl monkey_patch_reti_2
 
 ; ez80 size prefixes
 LIS			    .equ 0x49
@@ -69,7 +71,8 @@ init2:
 	; first copy common memory to location in kernel segment (0x4e000-0x4ffff)
 	; before mapping 8K sram over this area. The sole reason for doing this
 	; is to ensure that when timer interrupts occur (vblanks), the ADL-mode
-	; interrupt handler in the 0x40000 segment is actually present!
+	; interrupt handler in the 0x40000 segment is actually present no matter
+	; which bank is mapped!
 	ld hl, #s__DATA
 	ld de, #s__COMMONMEM
 	ld bc, #l__COMMONMEM
@@ -106,10 +109,16 @@ init2:
 	ld (hl), #0
 	ldir
 
+		; Monkey-patch some reti to ret, since the ADL interrupt
+		; handler does the actual reti
+		ld a,#0xc9 ; ret
+		ld (monkey_patch_reti_1),a
+		ld (monkey_patch_reti_2),a
+
         ; Hardware setup
         call init_hardware
 
-		call open_disk_images
+        call open_disk_images
 
         ; Call the C main routine
         call _main

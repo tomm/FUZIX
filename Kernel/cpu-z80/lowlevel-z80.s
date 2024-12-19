@@ -52,7 +52,8 @@
 	.globl _sys_cpu_feat
 	.globl _sys_stubs
 	.globl _set_cpu_type
-
+	.globl monkey_patch_reti_1
+	.globl monkey_patch_reti_2
 	.globl mmu_irq_ret
 
         ; imported symbols
@@ -472,6 +473,7 @@ intout:
 .endif
 	ld hl, #intret
 	push hl
+monkey_patch_reti_1:
 	reti			; We have now 'left' the interrupt
 				; and the controllers have seen the
 				; reti M1 cycle. However we still
@@ -559,6 +561,7 @@ preemption:
 .endif
 	ld hl, #intret2
 	push hl
+monkey_patch_reti_2:
 	reti			; We have now 'left' the interrupt
 				; and the controllers have seen the
 				; reti M1 cycle. However we still

@@ -2,15 +2,15 @@
 -i fuzix.ihx
 -b _CODE=0x0
 -b _COMMONMEM=0xF400
--l ez80_z80
+-l z80
 platform/platform-agon-light/crt0.rel
 platform/platform-agon-light/commonmem.rel
 platform/platform-agon-light/agonlight.rel
 platform/platform-agon-light/main.rel
 start.rel
 version.rel
-cpu-ez80_z80/lowlevel-ez80_z80.rel
-cpu-ez80_z80/usermem_std-ez80_z80.rel
+cpu-z80/lowlevel-z80.rel
+cpu-z80/usermem_std-z80.rel
 platform/platform-agon-light/tricks.rel
 timer.rel
 kdata.rel
