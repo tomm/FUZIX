@@ -57,8 +57,3 @@ TARGET=easy-z80 make
 ```
 
 Produces working userspace binaries for Agon.
-
-### TODO 
-
-The VSync interrupt is a poor timer (not always 60Hz). Should switch to using
-a PRT timer interrupt.

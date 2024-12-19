@@ -20,7 +20,7 @@
 			.globl _rootfs_image_fseek
 			.globl _rootfs_image_fread
 			.globl _rootfs_image_fwrite
-			.globl _vblank_interrupt_z80
+			.globl timer0_interrupt_z80
 			.globl _uart0_char_in
 	    .globl plt_interrupt_all
 
@@ -90,6 +90,10 @@ plt_interrupt_all:
 ; -----------------------------------------------------------------------------
             .area _CODE
 
+TMR0_CTL	.equ	0x80
+TMR0_DR_L	.equ	0x81
+TMR0_DR_H	.equ	0x82
+
 init_hardware:
             ; set system RAM size
 			; 512k - 64k (used by agon MOS) = 448K
@@ -104,14 +108,28 @@ init_hardware:
             call _program_vectors
             pop hl
 
-			; set up timer interrupt (using agon vblank)
-			ld hl, #_vblank_interrupt
+			; turn off vblank interrupt
+			ld a,#0xff
+			out0 (0x9b),a		; PB_DDR
+			xor a
+			out0 (0x9c),a		; PB_ALT1
+			out0 (0x9d),a		; PB_ALT2
+
+			; set up timer interrupt handler (using ez80f92 PRT timer 0)
+			ld hl, #timer0_interrupt
 			ld a, #4				; in segment 0x40000
 			call copy_a_top_hl24	; MOS requires 24-bit interrupt handler pointer
-			ld e, #0x32		; interrupt number
+			ld e, #0xa		; timer0 interrupt number
 			ld a, #0x14 	; mos_api_setintvector
 			.db #0x49   ; rst.lis (lis suffix)
 			rst #8
+
+			; set up timer0 (18.432MHz / 256 divider * 720 reload counter = 100Hz)
+			ld a,#0xdf
+			ld hl,#720
+			out0 (TMR0_CTL),a
+			out0 (TMR0_DR_L),l
+			out0 (TMR0_DR_H),h
 
 			; set up keyboard event handler
 			ld hl, #uart0_rx_interrupt
@@ -121,6 +139,9 @@ init_hardware:
 			ld a, #0x14 	; mos_api_setintvector
 			.db #0x49   ; rst.lis (lis suffix)
 			rst #8
+
+			xor a
+			ld (_uart0_char_in), a
 
             ret
 	
@@ -302,14 +323,12 @@ uart0_rx_z80:
 		ret
 
 ; arrive here in ADL mode (24-bit mode)
-_vblank_interrupt:
+timer0_interrupt:
 		di
 		push af
 
-		; acknowledge the gpio interrupt
-		in0	a,(0x9a)
-		OR	a,#2
-		out0 (0x9a),a
+		; Acknowledge timer0 interrupt
+		in0 a,(TMR0_CTL)
 
 		push bc
 		push de
@@ -319,7 +338,7 @@ _vblank_interrupt:
 
 		; call into Z80-mode
 		.db 0x40	; call.sis
-		call _vblank_interrupt_z80
+		call timer0_interrupt_z80
 
 		pop iy
 		pop ix
@@ -331,7 +350,7 @@ _vblank_interrupt:
 		.db 0x5b	; reti.lil
 		reti
 
-_vblank_interrupt_z80:
+timer0_interrupt_z80:
 		call interrupt_handler
 		.db #0x49   ; .lis suffix
 		ret
