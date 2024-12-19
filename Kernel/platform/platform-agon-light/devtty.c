@@ -72,7 +72,7 @@ void tty_pollirq(void)
         // Fuzix seems to want 8 for backspace
         if (uart0_char_in == 127) {
             tty_inproc(1, 8);
-        } else {
+        } else if (uart0_char_in != 17 /* ignore XON */) {
             tty_inproc(1, uart0_char_in);
         }
         uart0_char_in = 0;
