@@ -21,6 +21,7 @@
 			.globl _rootfs_image_fread
 			.globl _rootfs_image_fwrite
 			.globl _uart0_char_in
+			.globl _uart0_writeready
 	    .globl plt_interrupt_all
 
 	    .globl map_kernel
@@ -455,11 +456,24 @@ wait_uart0_cts:
 		in0 a,(0xa2)
 		tst a,#8
 		jr nz,wait_uart0_cts
-uart0_not_ready:
+wait_uart0_ready:
 		in0 a,(0xc5)  ; UART0_LSR
 		and #0x60      ; either TEMT or THRE (fifo empty, but transmit shift register can be active)
-		jr z, uart0_not_ready
+		jr z, wait_uart0_ready
 		; write to uart0
 		pop af
 		out0 (0xc0), a
+		ret
+
+_uart0_writeready:
+		in0 a,(0xa2)
+		tst a,#8
+		jr nz,uart0_notready
+		in0 a,(0xc5)  ; UART0_LSR
+		and #0x60      ; either TEMT or THRE (fifo empty, but transmit shift register can be active)
+		jr z, uart0_notready
+		ld l,#1
+		ret
+uart0_notready:
+		ld l,#0
 		ret

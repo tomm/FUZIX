@@ -7,13 +7,6 @@
 
 static char tbuf1[TTYSIZ];
 
-/* __banked is a hack because right now the compiler isn't generating out0
-   as the docs say it does for ez80. Need to rebase sdcc and check if a bug
-   is needed */
-
-__sfr __banked __at 0xC0 ttydatap;
-__sfr __banked __at 0xC5 ttystat;
-
 struct  s_queue  ttyinq[NUM_DEV_TTY+1] = {       /* ttyinq[0] is never used */
     {   NULL,    NULL,    NULL,    0,        0,       0    },
     {   tbuf1,   tbuf1,   tbuf1,   TTYSIZ,   0,   TTYSIZ/2 },
@@ -29,6 +22,7 @@ static uint8_t ttypoll;
 
 extern char uart0_char_in;
 extern void outchar(unsigned char c);
+extern char uart0_writeready(void);
 
 /* Write to system console */
 void kputchar(char c)
@@ -43,9 +37,7 @@ void kputchar(char c)
 char tty_writeready(uint8_t minor)
 {
     used(minor);
-    if (ttystat & 0x20)
-        return TTY_READY_NOW;
-    return TTY_READY_SOON;
+    return uart0_writeready();
 }
 
 void tty_putc(uint8_t minor, unsigned char c)
@@ -53,8 +45,7 @@ void tty_putc(uint8_t minor, unsigned char c)
     used(minor);
     used(c);
 
-    while (!(ttystat & 0x20));
-    ttydatap = c;
+    outchar(c);
 }
 
 void tty_sleeping(uint8_t minor)
